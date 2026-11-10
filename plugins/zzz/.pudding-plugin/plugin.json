@@ -1,0 +1,758 @@
+{
+  "schemaVersion": 1,
+  "id": "zzz",
+  "name": "绝区零一条龙反射桥",
+  "version": "0.5.0",
+  "description": "通过注入用户自己启动的绝区零一条龙 GUI 进程的原生 C++ 反射桥（127.0.0.1:23101），查询应用目录、读写已缓存配置，并按用户明确指令提交或停止自动化应用。桥只反射真实 ZContext，不自动运行任务。",
+  "skills": [
+    "./skills"
+  ],
+  "httpTools": [
+    {
+      "name": "status",
+      "title": "桥与宿主状态",
+      "description": "查询反射桥与绝区零一条龙宿主的整体状态：附着情况、实例列表、当前运行状态、最近运行结果与应用目录 hash。其余操作以本次返回的 catalogHash 作为乐观并发依据。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/status",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "concurrencySafe": true,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "idempotency": "safeRetry",
+        "cancellation": "reliable",
+        "verification": "none",
+        "compensation": "none",
+        "timeoutMs": 20000,
+        "unattended": "allowed",
+        "maxResultChars": 12000,
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "always",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "catalog.search",
+      "title": "搜索应用目录",
+      "description": "按应用 ID 或名称搜索绝区零一条龙已注册的应用目录，返回可独立运行的应用、默认组应用标记与账号实例列表，以及当前 catalogHash。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "应用 ID 或名称的子串，不区分大小写；省略时返回全部"
+          },
+          "includeInternal": {
+            "type": "boolean",
+            "description": "是否包含只能由宿主固定入口调用的内部应用，默认 false"
+          }
+        },
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/catalog/search",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "concurrencySafe": true,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "idempotency": "safeRetry",
+        "cancellation": "reliable",
+        "verification": "none",
+        "compensation": "none",
+        "timeoutMs": 20000,
+        "unattended": "allowed",
+        "maxResultChars": 24000,
+        "searchHint": "按应用 ID 或名称搜索绝区零一条龙应用目录，返回可运行应用与账号实例列表",
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "always",
+        "promptVisible": false,
+        "searchProvider": true
+      }
+    },
+    {
+      "name": "catalog.describe",
+      "title": "查看应用详情",
+      "description": "查看单个已注册应用的详情：名称、分组标记、是否需要通知，以及当前配置的字段清单（类型、是否敏感、是否允许通过本桥修改）与配置 hash。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string",
+            "description": "应用 ID，来自 catalog.search"
+          }
+        },
+        "required": [
+          "appId"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/catalog/describe",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "concurrencySafe": true,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "idempotency": "safeRetry",
+        "cancellation": "reliable",
+        "verification": "none",
+        "compensation": "none",
+        "timeoutMs": 20000,
+        "unattended": "allowed",
+        "maxResultChars": 24000,
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "afterRead",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "api.read",
+      "title": "读取运行状态",
+      "description": "读取宿主运行上下文的白名单字段：运行状态（stop/running/pause）、当前应用、最近一次应用运行结果、最近一次指令结果、初始化就绪与当前账号实例。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "context.state",
+                "context.current",
+                "context.lastRunResult",
+                "context.lastApplicationResult",
+                "context.ready",
+                "instance.currentIdx"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 16
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/api/read",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "concurrencySafe": true,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "idempotency": "safeRetry",
+        "cancellation": "reliable",
+        "verification": "none",
+        "compensation": "none",
+        "timeoutMs": 20000,
+        "unattended": "allowed",
+        "maxResultChars": 8000,
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "afterRead",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "api.invoke",
+      "title": "提交或停止应用",
+      "description": "向宿主提交运行一个已注册的非内部应用（method=run），或停止当前任务（method=stop）。run 只返回是否已提交（accepted），不代表执行完成；stop 核对停止状态，确认窗口内未停止则如实返回 unknown。必须携带最新的 catalogHash。",
+      "inputSchema": {
+        "type": "object",
+        "oneOf": [
+          {
+            "properties": {
+              "method": {
+                "const": "stop"
+              },
+              "catalogHash": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "method",
+              "catalogHash"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "method": {
+                "const": "run"
+              },
+              "catalogHash": {
+                "type": "string"
+              },
+              "appId": {
+                "type": "string",
+                "description": "来自 catalog.search 的应用 ID"
+              },
+              "instanceIdx": {
+                "type": "integer",
+                "description": "账号实例下标，来自目录实例列表"
+              },
+              "groupId": {
+                "type": "string",
+                "description": "应用组 ID，省略时为 one_dragon"
+              }
+            },
+            "required": [
+              "method",
+              "catalogHash",
+              "appId",
+              "instanceIdx"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/api/invoke",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 30000,
+      "execution": {
+        "effect": "gameWrite",
+        "effectIsDynamic": false,
+        "concurrencySafe": false,
+        "risk": "high",
+        "concurrency": "gameExclusive",
+        "leaseScope": "game:zzz",
+        "idempotency": "neverRetry",
+        "cancellation": "cooperative",
+        "verification": "state",
+        "compensation": "none",
+        "timeoutMs": 30000,
+        "unattended": "forbidden",
+        "maxResultChars": 8000,
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "afterRead",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "config.read",
+      "title": "读取应用配置",
+      "description": "读取一个应用的当前配置内容与 configHash。通知账号与密钥类字段的值会被屏蔽；configHash 供 config.update 做乐观并发校验。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "instanceIdx": {
+            "type": "integer"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "应用组 ID，省略时为 one_dragon"
+          }
+        },
+        "required": [
+          "appId",
+          "instanceIdx"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/config/read",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "concurrencySafe": true,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "idempotency": "safeRetry",
+        "cancellation": "reliable",
+        "verification": "none",
+        "compensation": "none",
+        "timeoutMs": 20000,
+        "unattended": "allowed",
+        "maxResultChars": 48000,
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "afterRead",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "config.update",
+      "title": "修改应用配置",
+      "description": "修改一个应用配置中已存在的简单字段。只接受安全标量值；通知账号、密钥、路径、脚本、流水线与启动命令类字段一律拒绝。写入后回读核验并返回新 configHash；catalogHash 或 configHash 过期时返回冲突。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "catalogHash": {
+            "type": "string"
+          },
+          "configHash": {
+            "type": "string",
+            "description": "config.read 返回的当前配置 hash"
+          },
+          "appId": {
+            "type": "string"
+          },
+          "instanceIdx": {
+            "type": "integer"
+          },
+          "groupId": {
+            "type": "string",
+            "description": "应用组 ID，省略时为 one_dragon"
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "value": {
+                  "description": "安全简单值：布尔、数字、短字符串、None 或浅层列表/对象"
+                }
+              },
+              "required": [
+                "key",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "catalogHash",
+          "configHash",
+          "appId",
+          "instanceIdx",
+          "updates"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/config/update",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "localWrite",
+        "effectIsDynamic": false,
+        "concurrencySafe": false,
+        "risk": "standard",
+        "concurrency": "serial",
+        "idempotency": "neverRetry",
+        "cancellation": "reliable",
+        "verification": "state",
+        "compensation": "snapshotRestore",
+        "timeoutMs": 20000,
+        "unattended": "forbidden",
+        "maxResultChars": 12000,
+        "modelUsage": "none",
+        "scope": "fields",
+        "scopeTarget": "updates",
+        "scopeReader": "zzz.http.config.read",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "afterRead",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "capabilities.search",
+      "title": "绝区零一条龙能力摘要搜索",
+      "description": "按关键词查询已登记接口和当前宿主业务声明，空 query 分页浏览；只返回摘要。常规业务优先现有任务、应用与配置目录。能力缺口时可定位未适配项，随后用 capabilities.describe 读取单项契约；不扫描运行时对象。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 8
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/capabilities/search",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "concurrencySafe": true,
+        "idempotency": "safeRetry",
+        "modelUsage": "none",
+        "verification": "none",
+        "maxResultChars": 20000,
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "onDemand",
+        "promptVisible": false,
+        "searchProvider": true
+      }
+    },
+    {
+      "name": "capabilities.describe",
+      "title": "绝区零一条龙能力契约",
+      "description": "读取 capabilities.search 返回的精确 id，取得来源、支持状态、调用映射、完整输入契约或业务目录详情入口；已发现、已支持、当前可调用及执行成功分别判断。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/capabilities/describe",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "concurrencySafe": true,
+        "idempotency": "safeRetry",
+        "modelUsage": "none",
+        "verification": "none",
+        "maxResultChars": 20000,
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "onDemand",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "host.inspect",
+      "title": "绝区零一条龙缺口诊断（非常规入口）",
+      "description": "仅在本轮常规接口已有具体缺口时检查现场静态结构。不是常规准备步骤。需要动态补足时携带能力目录签发的 gapId，取得现场 memberId 后先预览；不求值 getter、不构造对象、不执行表达式。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "modules、context、module:<已加载业务模块> 或 instance:<业务模块.现存类名>"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "maxItems": 8,
+            "description": "仅沿静态字典成员逐层定位，不执行表达式或 getter"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "missingCapability",
+              "contractDrift",
+              "unavailableCapability"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 1000,
+            "description": "本轮常规目录查询或接口失败的具体证据，不填泛泛探索理由"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          },
+          "gapId": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128,
+            "description": "能力目录实际未命中、未适配或契约不可用时签发；仅有自填 evidence 不能放行动态写入"
+          }
+        },
+        "required": [
+          "target",
+          "reason",
+          "evidence"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/host/inspect",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 20000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "risk": "observe",
+        "concurrency": "readParallel",
+        "concurrencySafe": true,
+        "idempotency": "safeRetry",
+        "modelUsage": "none",
+        "verification": "none",
+        "maxResultChars": 20000,
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "onDemand",
+        "promptVisible": false
+      }
+    },
+    {
+      "name": "host.prepare",
+      "title": "预览缺口补足动作",
+      "description": "仅当常规接口确有缺口时，使用本轮 gapId 和现场 memberId 预览动态方法调用或字段修改。核对目的、成员语义与影响；不执行目标。返回绑定会话、对象、签名／原值和全部参数的一次性 planId，五分钟过期。不得用于常规流程或保存快捷任务。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "gapId": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128
+          },
+          "memberId": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "missingCapability",
+              "contractDrift",
+              "unavailableCapability"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 1000,
+            "description": "本轮常规目录查询或接口失败的具体证据，不填泛泛探索理由"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 2000,
+            "description": "本次用户目标、已核对的成员语义与资料依据，不能从名称猜作用"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "invoke",
+              "set"
+            ]
+          },
+          "arguments": {
+            "type": "array",
+            "maxItems": 32,
+            "description": "Python 方法的位置参数，使用已检查的真实签名"
+          },
+          "keywords": {
+            "type": "object",
+            "maxProperties": 32,
+            "description": "真实具名参数；MaaEnd 后端方法使用其公开声明参数"
+          },
+          "value": {
+            "description": "已有字段的新简单值，保持现有类型；不能创建新字段或替换对象"
+          }
+        },
+        "required": [
+          "gapId",
+          "memberId",
+          "reason",
+          "evidence",
+          "purpose",
+          "operation"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/host/prepare",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 30000,
+      "execution": {
+        "effect": "readOnly",
+        "effectIsDynamic": false,
+        "risk": "observe",
+        "concurrencySafe": true,
+        "concurrency": "readParallel",
+        "idempotency": "safeRetry",
+        "cancellation": "reliable",
+        "verification": "none",
+        "compensation": "none",
+        "unattended": "forbidden",
+        "modelUsage": "none",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "onDemand",
+        "promptVisible": false,
+        "maxResultChars": 20000
+      }
+    },
+    {
+      "name": "host.invoke",
+      "title": "执行一次动态补足调用",
+      "description": "仅用于常规接口确有缺口且已完成预览的动态方法调用。只接受 host.prepare 返回的当前一次性 planId，不接受原始路径、参数或脚本。不改变预览参数，不自动重试，不保存快捷任务。方法返回、请求接纳与业务完成分别核验。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "planId"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/host/invoke",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 30000,
+      "execution": {
+        "effect": "externalWrite",
+        "effectIsDynamic": false,
+        "risk": "high",
+        "concurrencySafe": false,
+        "concurrency": "serial",
+        "idempotency": "neverRetry",
+        "cancellation": "unconfirmed",
+        "verification": "state",
+        "compensation": "none",
+        "unattended": "forbidden",
+        "modelUsage": "unknown",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "onDemand",
+        "promptVisible": false,
+        "maxResultChars": 20000
+      }
+    },
+    {
+      "name": "host.set",
+      "title": "执行一次动态补足修改",
+      "description": "仅用于常规接口确有缺口且已完成预览的已有字段修改。使用一次性 planId，执行前复核原对象和原值；只改预览字段。Python 字段修改仅保证运行时状态，MaaEnd 使用官方版本化保存；回读失败或超时先核实，禁止自动重试。不能绕过专用配置与明确限制，不保存快捷任务。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "planId"
+        ],
+        "additionalProperties": false
+      },
+      "method": "POST",
+      "url": "http://127.0.0.1:23101/host/set",
+      "headers": {
+        "X-Pudding-Token": "${ENV:ZZZ_BRIDGE_TOKEN}"
+      },
+      "timeoutMs": 30000,
+      "execution": {
+        "effect": "externalWrite",
+        "effectIsDynamic": false,
+        "risk": "high",
+        "concurrencySafe": false,
+        "concurrency": "serial",
+        "idempotency": "neverRetry",
+        "cancellation": "unconfirmed",
+        "verification": "state",
+        "compensation": "none",
+        "unattended": "forbidden",
+        "modelUsage": "unknown",
+        "deferred": true,
+        "alwaysLoad": false,
+        "exposure": "onDemand",
+        "promptVisible": false,
+        "maxResultChars": 20000
+      }
+    }
+  ]
+}
